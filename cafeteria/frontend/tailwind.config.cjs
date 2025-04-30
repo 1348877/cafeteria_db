@@ -1,8 +1,8 @@
-// frontend/tailwind.config.cjs
+
 module.exports = {
     content: [
       "./index.html",
-      "./src/**/*.{js,jsx}",    // incluye tus componentes
+      "./src/**/*.{js,jsx}",    
     ],
     theme: {
       extend: {},

@@ -1,38 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 export default function AddProductForm({ onAdded }) {
-  const [f, setF] = useState({name:'',description:'',price:'',stock:''});
-  const ch = e=>setF({...f,[e.target.name]:e.target.value});
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    stock: ""
+  });
 
-  const sb = async e=>{
+  const handleChange = e => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async e => {
     e.preventDefault();
-    const r = await fetch('http://localhost:3000/api/products',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(f)
+    await fetch("http://localhost:3000/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form)
     });
-    if(r.ok){ alert('Agregado'); setF({name:'',description:'',price:'',stock:''}); onAdded();}
-    else alert('Error');
+    setForm({ name: "", description: "", price: "", stock: "" });
+    if (onAdded) onAdded();
   };
 
   return (
-    <form onSubmit={sb}>
-      <div className="mb-3">
-        <label className="form-label">Nombre</label>
-        <input name="name" value={f.name} onChange={ch} className="form-control" required/>
+    <form onSubmit={handleSubmit} className="mt-4">
+      <div className="row">
+        <div className="col">
+          <input name="name" placeholder="Nombre" className="form-control" value={form.name} onChange={handleChange} required />
+        </div>
+        <div className="col">
+          <input name="description" placeholder="Descripción" className="form-control" value={form.description} onChange={handleChange} required />
+        </div>
+        <div className="col">
+          <input name="price" type="number" step="0.01" placeholder="Precio" className="form-control" value={form.price} onChange={handleChange} required />
+        </div>
+        <div className="col">
+          <input name="stock" type="number" placeholder="Stock" className="form-control" value={form.stock} onChange={handleChange} required />
+        </div>
+        <div className="col">
+          <button className="btn btn-success w-100" type="submit">Añadir</button>
+        </div>
       </div>
-      <div className="mb-3">
-        <label className="form-label">Descripción</label>
-        <input name="description" value={f.description} onChange={ch} className="form-control"/>
-      </div>
-      <div className="mb-3">
-        <label className="form-label">Precio</label>
-        <input name="price" type="number" step="0.01" value={f.price} onChange={ch} className="form-control" required/>
-      </div>
-      <div className="mb-3">
-        <label className="form-label">Stock</label>
-        <input name="stock" type="number" value={f.stock} onChange={ch} className="form-control" required/>
-      </div>
-      <button type="submit" className="btn btn-primary">Agregar Producto</button>
     </form>
   );
 }

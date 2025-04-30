@@ -1,81 +1,49 @@
-import React, { useState } from 'react';
-import ProductList from './components/ProductList';
-import AddProductForm from './components/AddProductForm';
-import CartPanel from './components/CartPanel';
-import Voucher from './components/Voucher';
-import SalesHistory from './components/SalesHistory';
+import React, { useState } from "react";
+import ProductList from "./components/ProductList";
+import CartPanel from "./components/CartPanel";
+import AddProductForm from "./components/AddProductForm";
+import Voucher from "./components/Voucher";
 
-export default function App() {
+function App() {
   const [cart, setCart] = useState([]);
-  const [voucher, setVoucher] = useState(null);
-  const [refresh, setRefresh] = useState(false);
+  const [saleResult, setSaleResult] = useState(null);
 
   const handleAdd = (product) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
+    const existing = cart.find(p => p.id === product.id);
+    if (existing) {
+      setCart(cart.map(p => p.id === product.id ? { ...p, quantity: p.quantity + 1 } : p));
+    } else {
+      setCart([...cart, { ...product, quantity: 1 }]);
+    }
   };
 
-  const handleRemove = (id) => {
-    setCart((prev) => prev.filter((i) => i.id !== id));
-  };
+  const handleRemove = id => setCart(cart.filter(p => p.id !== id));
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
-
-    const sale = {
-      created_at: new Date().toISOString(),
-      items: cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: parseFloat(item.price),
-        quantity: parseInt(item.quantity),
-      })),
-      total: cart.reduce((sum, i) => sum + i.price * i.quantity, 0),
-    };
-
+    const items = cart.map(p => ({ product_id: p.id, quantity: p.quantity }));
     const res = await fetch('http://localhost:3000/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sale),
+      body: JSON.stringify({ items }),
     });
-
+    const data = await res.json();
     if (res.ok) {
-      alert('Venta registrada');
-      setVoucher(sale);      // Mostrar comprobante
-      setCart([]);           // Limpiar carrito
-      setRefresh(!refresh);  // Forzar recarga de historial
+      setSaleResult(data);
+      setCart([]);
     } else {
-      alert('Error al registrar venta');
+      alert(data.error || 'Error al registrar venta');
     }
   };
 
   return (
-    <div className="container mt-4">
-      <h1 className="mb-4">POS Cafetería</h1>
-
-      <div className="row">
-        <div className="col-md-6">
-          <ProductList onAdd={handleAdd} />
-          <AddProductForm onAdded={() => setRefresh(!refresh)} />
-        </div>
-        <div className="col-md-6">
-          <CartPanel
-            cart={cart}
-            onRemove={handleRemove}
-            onCheckout={handleCheckout}
-          />
-          <SalesHistory key={refresh} />
-        </div>
-      </div>
-
-      <Voucher sale={voucher} onClose={() => setVoucher(null)} />
+    <div className="container">
+      <h1 className="mt-3">POS Cafetería</h1>
+      <AddProductForm onAdded={() => window.location.reload()} />
+      <ProductList onAdd={handleAdd} />
+      <CartPanel cart={cart} onRemove={handleRemove} onCheckout={handleCheckout} />
+      {saleResult && <Voucher sale={saleResult} onClose={() => setSaleResult(null)} />}
     </div>
   );
 }
+
+export default App;

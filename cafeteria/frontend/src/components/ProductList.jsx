@@ -1,42 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 
 export default function ProductList({ onAdd }) {
   const [products, setProducts] = useState([]);
-  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/products')
-      .then(r=>r.json()).then(setProducts);
+    fetch("http://localhost:3000/api/products")
+      .then(res => res.json())
+      .then(setProducts);
   }, []);
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
-    <>
-      <input
-        type="text"
-        className="form-control mb-3"
-        placeholder="Buscar…"
-        value={search}
-        onChange={e=>setSearch(e.target.value)}
-      />
-      <ul className="list-group mb-3">
-        {filtered.map(p=>(
-          <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <strong>{p.name}</strong><br/>
-              <small>Stock: {p.stock}</small>
+    <div className="row mt-4">
+      {products.map(p => (
+        <div className="col-3 mb-3" key={p.id}>
+          <div className="card h-100">
+            <div className="card-body">
+              <h5 className="card-title">{p.name}</h5>
+              <p className="card-text">{p.description}</p>
+              <p><strong>S/. {p.price}</strong></p>
+              <button className="btn btn-success" onClick={() => onAdd(p)}>Agregar</button>
             </div>
-            <button
-              className="btn btn-sm btn-success"
-              disabled={p.stock<1}
-              onClick={()=>onAdd(p)}
-            >Agregar</button>
-          </li>
-        ))}
-      </ul>
-    </>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
