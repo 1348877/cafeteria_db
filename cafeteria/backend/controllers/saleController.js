@@ -1,42 +1,54 @@
 const pool = require('../config/db');
 
-// Crear venta (modificado para devolver más detalles)
+// Crear venta con control de stock y retorno detallado
 exports.createSale = async (req, res) => {
   const { items } = req.body;
+  let connection;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     await connection.beginTransaction();
 
     let total = 0;
+    const ventaItems = [];
+
     for (const item of items) {
-      const [product] = await connection.query('SELECT price, stock FROM products WHERE id = ?', [item.product_id]);
-      if (product[0].stock < item.quantity) throw new Error(`Stock insuficiente para ${item.name}`);
+      const [product] = await connection.query('SELECT name, price, stock FROM products WHERE id = ?', [item.product_id]);
+      if (!product[0]) throw new Error(`Producto ID ${item.product_id} no encontrado`);
+      if (product[0].stock < item.quantity) throw new Error(`Stock insuficiente para ${product[0].name}`);
       total += product[0].price * item.quantity;
+
+      ventaItems.push({
+        product_id: item.product_id,
+        name: product[0].name,
+        quantity: item.quantity,
+        price: product[0].price
+      });
     }
 
     const [saleResult] = await connection.query('INSERT INTO sales (total) VALUES (?)', [total]);
     const saleId = saleResult.insertId;
 
-    for (const item of items) {
-      const [product] = await connection.query('SELECT price FROM products WHERE id = ?', [item.product_id]);
+    for (const item of ventaItems) {
       await connection.query(
         'INSERT INTO sale_items (sale_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
-        [saleId, item.product_id, item.quantity, product[0].price]
+        [saleId, item.product_id, item.quantity, item.price]
       );
       await connection.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 
+    const [[{ created_at }]] = await connection.query('SELECT created_at FROM sales WHERE id = ?', [saleId]);
+
     await connection.commit();
-    res.status(201).json({ id: saleId, total, items });
+    res.status(201).json({ id: saleId, total, created_at, items: ventaItems });
   } catch (error) {
-    await connection.rollback();
-    res.status(500).json({ error: error.message });
+    if (connection) await connection.rollback();
+    res.status(500).json({ error: error.message || 'Error al registrar la venta' });
   } finally {
-    connection.release();
+    if (connection) connection.release();
   }
 };
 
-// Obtener historial de ventas
+// Historial de ventas detallado agrupado por venta
 exports.getSales = async (req, res) => {
   try {
     const [sales] = await pool.query(`
@@ -47,7 +59,6 @@ exports.getSales = async (req, res) => {
       ORDER BY s.created_at DESC
     `);
 
-    // Agrupar las ventas
     const salesMap = sales.reduce((acc, row) => {
       if (!acc[row.id]) {
         acc[row.id] = {
@@ -68,17 +79,17 @@ exports.getSales = async (req, res) => {
       return acc;
     }, {});
 
-    res.json(Object.values(salesMap));  // Devolvemos las ventas agrupadas
+    res.json(Object.values(salesMap));
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching sales' });
+    res.status(500).json({ error: 'Error al obtener historial de ventas' });
   }
 };
 
-// Obtener productos más vendidos
+// Productos más vendidos del sistema
 exports.getTopProducts = async (req, res) => {
   try {
     const [topProducts] = await pool.query(`
-      SELECT p.id, p.name, SUM(si.quantity) as total_sold
+      SELECT p.id, p.name, SUM(si.quantity) AS total_sold
       FROM sale_items si
       JOIN products p ON si.product_id = p.id
       GROUP BY p.id, p.name
@@ -87,24 +98,6 @@ exports.getTopProducts = async (req, res) => {
     `);
     res.json(topProducts);
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching top products' });
-  }
-};
-
-// Obtener ventas del día (resumen diario)
-exports.getSalesSummary = async (req, res) => {
-  try {
-    const [salesSummary] = await pool.query(`
-      SELECT p.name, SUM(si.quantity) as total_sold, SUM(si.quantity * si.price) as total_revenue
-      FROM sale_items si
-      JOIN products p ON si.product_id = p.id
-      WHERE DATE(s.created_at) = CURDATE()  // Solo las ventas de hoy
-      GROUP BY p.id, p.name
-      ORDER BY total_sold DESC
-    `);
-
-    res.json(salesSummary);
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching daily summary' });
+    res.status(500).json({ error: 'Error al obtener productos más vendidos' });
   }
 };
